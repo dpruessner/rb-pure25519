@@ -7,6 +7,10 @@ core Bignum for calculations on prime Finite Fields.
 
 ### Ephermeral DH Exchange
 
+```sh
+$ gem install rb-pure25519
+```
+
 ```ruby
 require 'rb-pure25519'
 

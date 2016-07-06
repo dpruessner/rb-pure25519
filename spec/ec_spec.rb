@@ -1,5 +1,4 @@
-require 'rb25519'
-require 'pry'
+require 'rb-pure25519'
 require 'securerandom'
 
 $nacl = false
