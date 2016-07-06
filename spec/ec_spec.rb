@@ -144,19 +144,19 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
     end
 
     it "(basic) implements String clamp" do
-      expect( ("\x00"*32).curve25519_clamp ).to_not be_nil
+      expect( ("\x00"*32).rb25519_clamp ).to_not be_nil
     end
     it "(basic) implements Integer clamp" do
-      expect( 0.curve25519_clamp ).to_not be_nil
+      expect( 0.rb25519_clamp ).to_not be_nil
     end
 
     it "(basic) String and Integer clamps are equal" do
-      expect( 0.curve25519_clamp.to_binary_string ).to eq( ("\x00"*32).curve25519_clamp )
+      expect( 0.rb25519_clamp.to_binary_string ).to eq( ("\x00"*32).rb25519_clamp )
     end
 
     if $nacl
       it "(nacl) Should do scaling on from basepoint 9" do
-        key  = RbNaCl::GroupElements::Curve25519.new ("\x00"*32).curve25519_clamp
+        key  = RbNaCl::GroupElements::Curve25519.new ("\x00"*32).rb25519_clamp
         base = RbNaCl::GroupElements::Curve25519.base
 
         expect( base.mult(key).to_s.to_binary ).to eq(@base_to_0_clamped)
@@ -168,7 +168,7 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
     end
 
     it "(Montgomery25519) should do scaling on from basepoint 9" do
-      key = @field[0.curve25519_clamp].to_i
+      key = @field[0.rb25519_clamp].to_i
       
       p   = @curve.scale_double_add(key, @curve_basepoint)
 
@@ -178,7 +178,7 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
 
     if $nacl
       it "(Montgomery25519) should scale random values to equal RbNaCl calculated values" do
-        rand_val_str = SecureRandom.random_bytes(32).curve25519_clamp
+        rand_val_str = SecureRandom.random_bytes(32).rb25519_clamp
         rand_val     = rand_val_str.to_binary
 
         ts = Time.now
@@ -193,7 +193,7 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
 
     if $nacl
       it "(Montgomery25519) should perform ECDHE with RbNaCl" do
-        nacl_val_str = SecureRandom.random_bytes(32).curve25519_clamp
+        nacl_val_str = SecureRandom.random_bytes(32).rb25519_clamp
 
 
         
@@ -201,7 +201,7 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
     end
 
     it "(Montgomery25519) should have Projective and Affine scaling equal for random values" do
-      rand_val_str = SecureRandom.random_bytes(32).curve25519_clamp
+      rand_val_str = SecureRandom.random_bytes(32).rb25519_clamp
       rand_val     = rand_val_str.to_binary
 
       scaled_xz = @curve.scale_proj(rand_val, @curve_basepoint.to_xz)
@@ -230,7 +230,7 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
       n = 10
 
       n.times do
-        rand_val_str = SecureRandom.random_bytes(32).curve25519_clamp
+        rand_val_str = SecureRandom.random_bytes(32).rb25519_clamp
         rand_val     = rand_val_str.to_binary
 
         proj_dt += time_it {
@@ -248,9 +248,73 @@ RSpec.describe Rb25519::FField::MontgomeryEC do
 
       expect( aff_dt / proj_dt ).to be >= 10
     end
+
+  end # Projective Benchmarks 
+
+end
+
+
+RSpec.describe Rb25519 do
+
+  context "as a module" do
     
+    it "generates a random secret key" do
+      skey = Rb25519.random_secret_str
+      expect( skey ).to_not   be nil
+      expect( skey.length).to eq(32)
+    end
 
+    it "generates a public key from the random secret key (str)" do
+      skey = Rb25519.random_secret_str
+      pkey = Rb25519.public_key_str(skey)
+
+      expect( pkey ).to be_a(String)
+    end
+
+    if $nacl
+      it "generates a public key equal to the NaCl library" do
+        skey = Rb25519.random_secret_str
+        pkey = Rb25519.public_key_str(skey)
+
+        nacl_val = RbNaCl::GroupElements::Curve25519.base.mult(
+            RbNaCl::GroupElements::Curve25519.new(skey)).to_s
+
+        expect( nacl_val.to_s ).to eq(pkey)
+      end
+    end
+
+    it "generates a shared secret from two random secrets (str)" do
+        skey1 = Rb25519.random_secret_str
+        pkey1 = Rb25519.public_key_str(skey1)
+
+        skey2 = Rb25519.random_secret_str
+        pkey2 = Rb25519.public_key_str(skey2)
+
+        shared_secret1 = Rb25519.shared_secret_str(pkey1, skey2)
+        shared_secret2 = Rb25519.shared_secret_str(pkey2, skey1)
+
+        expect( shared_secret1 ).to eq(shared_secret2)
+    end
+
+    if $nacl
+      it "generates a shared secret equal to NaCl generated secret" do
+        skey1 = Rb25519.random_secret_str
+        pkey1 = Rb25519.public_key_str(skey1)
+
+        skey2 = Rb25519.random_secret_str
+
+        nacl_pkey = RbNaCl::GroupElements::Curve25519.base.mult(
+            RbNaCl::GroupElements::Curve25519.new(skey2)).to_s
+        
+        shared_secret1 = Rb25519.shared_secret_str(nacl_pkey, skey1)
+
+        shared_secret2 = RbNaCl::GroupElements::Curve25519.new(pkey1).mult( skey2).to_s
+
+        expect( shared_secret1 ).to eq(shared_secret1)
+
+      end
+    end
+
+    
   end
-
-
 end

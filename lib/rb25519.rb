@@ -21,7 +21,7 @@ class Integer
     [a,b]
   end
 
-  def curve25519_clamp
+  def rb25519_clamp
     v = self & 248
     v &= (127 << (31*8))
     v |= ( 64 << (31*8))
@@ -50,7 +50,7 @@ class String
     end
     v
   end
-  def curve25519_clamp
+  def rb25519_clamp
     bytes = self.each_byte.to_a
     bytes[0] &= 248;
     bytes[31] &= 127;
@@ -146,7 +146,7 @@ module Rb25519
       end
 
       def inspect
-        "#<FiniteFieldValue_#{@field.p}: #{@val} >"
+        "#<FFieldValue_#{@field.p}: #{@val} >"
       end
 
       def to_s
@@ -414,15 +414,6 @@ module Rb25519
     #
     #   H = [5,8] on curve.
     #
-    #   H  + H   ==  [14, 44]
-    #   3  * H   ==  [41, 36]
-    #   42 * H   ==  [14,  3]
-    #   43 * H   ==  [ 5, 39]
-    #
-    #   44 * H   ==  Infinity
-    #
-    #   45 * H   ==  H
-    #
     #
     class MontgomeryEC < EC
       attr_accessor :a, :b
@@ -444,6 +435,11 @@ module Rb25519
         (@b * y**2) == (x**3) + x**2 * @a + x
       end
 
+
+      ##
+      #
+      # Add points in affine coordinates
+      #
       def point_add(point_a, point_b)
 
         return point_b if point_a == ECInfinity
@@ -476,6 +472,10 @@ module Rb25519
       end
 
 
+      ##
+      # 
+      # Doubles a point in affine coordinates
+      #
       def double_point(point_a)
         #puts "Double point: #{point_a.inspect}"
 
@@ -503,22 +503,13 @@ module Rb25519
 
     end
 
+
+
     class EC25519 < MontgomeryEC
       attr_accessor :gen
 
       def initialize
-
         super(FField.new(2**255 - 19), a: 486662, b: 1 )
-      end
-    end
-
-
-    class ECFirst < EC
-      def on_curve(x,y)
-        x = @field[x] unless x.kind_of? FFieldValue
-        y = @field[y] unless y.kind_of? FFieldValue
-
-        y**2 == x**3 + x * 2 + 3
       end
     end
 
@@ -526,12 +517,18 @@ module Rb25519
 
 
 
-  # Extend the Montgomery EC with 
+
+
+  ##
+
+  # Extend the Montgomery EC with projective (XZ) coordinate functions
+  #
   class FField::MontgomeryEC
 
     def xz_from_xy(point)
       return [ @field[point[0].to_i], @field[1] ]
     end
+
 
     ##
     # Convert XZ to XY coordinates.
@@ -551,6 +548,7 @@ module Rb25519
 
       return y_sq.sqrt.map{|e| [x, e]}
     end
+
 
     ## 
     #
@@ -584,7 +582,12 @@ module Rb25519
     # Actually, best description is at:
     # 
     # Cryptographic Algorithms on Reconfigurable Hardware p.301
+    #
+    # Actually-- I'm not sure where this one came from.  Figuring out XZ
+    # projective point adding was a real pain in the ass!
     # 
+    #
+    # Test points for scaling/point addition and testing the Montgomery ladder.
     #
     #(5 : 8 : 1)
     # --
@@ -672,6 +675,12 @@ module Rb25519
       pa
     end
 
+
+    ##
+    # 
+    # List of scaled points of [5,8] on toy curve to test laddering and other
+    # REPL-style exploration/testing to get this working right.
+    #
     def pts
       [
         [ @field[ 0], @field[ 0] ],    # 0
@@ -688,4 +697,107 @@ module Rb25519
     end
 
   end
+
+
+
+
+
+
+
+  # Module Methods
+
+  CURVE   = FField::EC25519.new   
+  BASE_XZ = [ CURVE.field[9], CURVE.field[1] ]
+
+
+
+  def self.string_to_number(val)
+    v = 0
+    val.reverse.each_byte do |byte| 
+      v = (v << 8) | byte
+    end
+    v
+  end
+
+  def self.number_to_string(v)
+    ary = []
+    while v > 0
+      ary << (v & 0xFF)
+      v >>= 8
+    end
+    ary.pack('c*')
+  end
+
+  def self.clamp_string(str)
+    bytes = str.each_byte.to_a
+    bytes[0] &= 248;
+    bytes[31] &= 127;
+    bytes[31] |= 64;
+
+    return bytes.pack('c*')
+  end
+
+  def self.random_secret_str
+    rv = SecureRandom.random_bytes(32)
+    rv = clamp_string(rv)
+    rv
+  end
+
+  def self.random_secret_num
+    string_to_number(random_secret_str)
+  end
+    
+
+  #
+  #
+  def self.public_key_num(secret)
+    if String === secret
+      secret = string_to_number(secret)
+    end
+
+    xz = CURVE.scale_proj( secret, BASE_XZ )
+    (xz[0] / xz[1]).to_i
+  end
+
+
+  def self.public_key_str(secret)
+    number_to_string( public_key_num(secret) )
+  end
+
+  ##
+  # Secret is a 'k' in Q = k*P
+  #
+  # We want to calculate: 
+  #
+  #   P_shared_secret = (skey + other_skey) * P_base
+  #
+  # We get there because:
+  #
+  #   P_other_pkey = (other_skey) * P_base
+  #
+  #
+  # So continuing to scale P_other_pkey by `skey` will get us to
+  # P_shared_secret.  The other party is also doing this calculation; the
+  # Abelian group property means this operation is commutative.
+  #
+  # Note that the Points are all X points in XZ projective space.
+  #
+  #
+  def self.shared_secret_num(pkey, skey)
+    if String === pkey
+      pkey = string_to_number(pkey)
+    end
+    if String === skey
+      skey = string_to_number(skey)
+    end
+
+    shared_xz = CURVE.scale_proj( skey, [ CURVE.field[pkey], CURVE.field[1] ] )
+
+    (shared_xz[0] / shared_xz[1]).to_i    # Final projective -> affine inversion
+  end
+    
+  def self.shared_secret_str(pkey, skey)
+    number_to_string( shared_secret_num(pkey, skey) )
+  end
+
 end
