@@ -27,7 +27,16 @@ shared_secret1 == shared_secret2   #==> true              # shared_secret used f
 ## Other notes
 
 There's a number of functions for other Montgomery curves — there's a toy curve in there that I used to 
-verify some assumptions in the Montgomery EC ladder and in the number theory, generally.  
+verify some assumptions in the Montgomery EC ladder and in the number theory
+usin Sage Math.
+
+We started using EC25519 when TLS was too heavy for an embedded IoT product: 
+[Sprinkl Conserve](http://sprinkl.io).   We were looking for a pure ruby
+EC25519.  We landed on using RbNaCl for the server-side (it was available in the
+Ubuntu distribution on our cloud platform).  We later returned to the subject to
+create this library for anyone who needs a pure ruby EC25519 implementation.
+
+
 
 
 Powered by Curve25519.

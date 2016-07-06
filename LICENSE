@@ -19,3 +19,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+I really cannot stress enough how, if you want to use this library, you should
+do your own damn homework and make sure it is secure enough for your needs.  I
+took pains to make sure the tests work; however, it may not be immune to
+side-channel attacks related to how Ruby implements the multiplications in
+Bignum or other places.  However, if your attacker can measure the power of the
+CPU on a modern CPU that can run Ruby, then they probably have **far** easier
+ways of reading memory across data busses to gain access to secure keys.  Or
+access to root accounts and they can just read the main memory.  It's really
+easy to find EC25519 keys in memory.  — Daniel
