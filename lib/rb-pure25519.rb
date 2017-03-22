@@ -3,6 +3,7 @@
 #
 
 require 'prime'
+require 'securerandom'
 
 
 
